@@ -79,6 +79,12 @@ class SubmissionRepository @Inject()(implicit mc: ReactiveMongoComponent, ec: Ex
     performUpdate(query, update)
   }
 
+  def updateNotificationCounter(conversationId: String, noOfNotifications: Int): Future[Option[Submission]] = {
+    val query = Json.obj("actions.id" -> conversationId)
+    val update = Json.obj("$set" -> Json.obj("noOfNotifications" -> noOfNotifications))
+    performUpdate(query, update)
+  }
+
   def addAction(mrn: String, newAction: Action): Future[Option[Submission]] = {
     val query = Json.obj("mrn" -> mrn)
     val update = Json.obj("$addToSet" -> Json.obj("actions" -> newAction))

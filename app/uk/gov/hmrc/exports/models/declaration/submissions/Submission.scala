@@ -27,7 +27,8 @@ case class Submission(
   lrn: String,
   mrn: Option[String] = None,
   ducr: String,
-  actions: Seq[Action] = Seq.empty
+  actions: Seq[Action] = Seq.empty,
+  noOfNotifications: Int = 0
 )
 
 object Submission {

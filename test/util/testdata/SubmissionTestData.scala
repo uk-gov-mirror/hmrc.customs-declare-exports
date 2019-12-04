@@ -32,7 +32,7 @@ object SubmissionTestData {
   lazy val actionCancellation =
     Action(requestType = CancellationRequest, id = actionId, requestTimestamp = action.requestTimestamp.plusHours(3))
   lazy val submission: Submission =
-    Submission(uuid = uuid, eori = eori, lrn = lrn, mrn = Some(mrn), ducr = ducr, actions = Seq(action))
+    Submission(uuid = uuid, eori = eori, lrn = lrn, mrn = Some(mrn), ducr = ducr, actions = Seq(action), noOfNotifications = 0)
   lazy val submission_2: Submission =
     Submission(uuid = uuid_2, eori = eori, lrn = lrn, mrn = Some(mrn_2), ducr = ducr, actions = Seq(action_2))
   lazy val submission_3: Submission =

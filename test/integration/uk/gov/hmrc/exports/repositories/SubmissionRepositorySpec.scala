@@ -122,6 +122,32 @@ class SubmissionRepositorySpec
     }
   }
 
+  "Submission Repository on updateNotificationCounter" should {
+
+    "return empty Option" when {
+
+      "there is no Submission with given ConversationId" in {
+
+        repo.updateNotificationCounter(actionId, 2).futureValue mustNot be(defined)
+      }
+    }
+
+    "return updated submission" when {
+
+      "submission with conversationID exists" in {
+
+        repo.save(submission).futureValue
+
+        val noOfNotifications = 3
+        val expectedSubmission = submission.copy(noOfNotifications = noOfNotifications)
+
+        val updatedSubmission = repo.updateNotificationCounter(actionId, noOfNotifications).futureValue
+
+        updatedSubmission.value must equal(expectedSubmission)
+      }
+    }
+  }
+
   "Submission Repository on addAction" when {
 
     "there is no Submission with given MRN" should {
