@@ -20,15 +20,17 @@ import java.util
 
 import com.github.cloudyrock.mongock.{ChangeLog, ChangeSet}
 import com.mongodb.client.{MongoCollection, MongoDatabase}
-import org.bson.{BsonType, Document}
+import org.bson
+import org.bson.{BsonDocument, BsonElement, BsonString, BsonSymbol, BsonType, Document}
+import org.mongodb.scala.model.Aggregates._
 import org.mongodb.scala.model.Filters.{eq => feq, ne => fne, _}
-import org.mongodb.scala.model.UpdateOneModel
 import org.mongodb.scala.model.Updates.{rename, set}
 import play.api.Logger
 import uk.gov.hmrc.exports.models.generators.{IdGenerator, StringIdGenerator}
 import uk.gov.hmrc.exports.services.CountriesService
 
 import scala.collection.JavaConversions._
+import scala.io.Source
 
 @ChangeLog
 class CacheChangeLog {
@@ -148,40 +150,47 @@ class CacheChangeLog {
 
     logger.info("Applying 'CEDS-2387 Add ID field to /items/packageInformation' db migration...")
 
-    val batchSize = 10
-    val documents: Iterable[Document] = getDeclarationsCollection(db)
-      .find(
-        and(
-          exists("items"),
-          not(size("items", 0)),
-          exists("items.packageInformation"),
-          not(size("items.packageInformation", 0)),
-          not(exists("items.packageInformation.id"))
-        )
-      )
-      .batchSize(batchSize)
+    val fileName = "migrationscripts/Change007-packageInformationId.js"
+    val scriptFile = Source.fromURL(getClass.getClassLoader.getResource(fileName), "UTF-8")
+    val mappingFunction = scriptFile.mkString
+    scriptFile.close()
 
-    documents.grouped(batchSize).zipWithIndex.foreach {
-      case (documentsBatch, idx) =>
-        logger.info(s"ChangeSet 007. Updating batch no. $idx...")
+    migrateWithJavaScript(db)(mappingFunction)
 
-        val requests = documentsBatch.map { document =>
-          val items = document.get("items", classOf[util.List[Document]])
-          val itemsUpdated: util.List[Document] = items.map(updateItem)
-          logger.debug(s"Items updated: $itemsUpdated")
-
-          val documentId = document.get(INDEX_ID).asInstanceOf[String]
-          val eori = document.get(INDEX_EORI).asInstanceOf[String]
-          val filter = and(feq(INDEX_ID, documentId), feq(INDEX_EORI, eori))
-          val update = set[util.List[Document]]("items", itemsUpdated)
-          logger.debug(s"[filter: $filter] [update: $update]")
-
-          new UpdateOneModel[Document](filter, update)
-        }.toSeq
-
-        getDeclarationsCollection(db).bulkWrite(requests)
-        logger.info(s"ChangeSet 007. Updated batch no. $idx")
-    }
+//    val batchSize = 10
+//    val documents: Iterable[Document] = getDeclarationsCollection(db)
+//      .find(
+//        and(
+//          exists("items"),
+//          not(size("items", 0)),
+//          exists("items.packageInformation"),
+//          not(size("items.packageInformation", 0)),
+//          not(exists("items.packageInformation.id"))
+//        )
+//      )
+//      .batchSize(batchSize)
+//
+//    documents.grouped(batchSize).zipWithIndex.foreach {
+//      case (documentsBatch, idx) =>
+//        logger.info(s"ChangeSet 007. Updating batch no. $idx...")
+//
+//        val requests = documentsBatch.map { document =>
+//          val items = document.get("items", classOf[util.List[Document]])
+//          val itemsUpdated: util.List[Document] = items.map(updateItem)
+//          logger.debug(s"Items updated: $itemsUpdated")
+//
+//          val documentId = document.get(INDEX_ID).asInstanceOf[String]
+//          val eori = document.get(INDEX_EORI).asInstanceOf[String]
+//          val filter = and(feq(INDEX_ID, documentId), feq(INDEX_EORI, eori))
+//          val update = set[util.List[Document]]("items", itemsUpdated)
+//          logger.debug(s"[filter: $filter] [update: $update]")
+//
+//          new UpdateOneModel[Document](filter, update)
+//        }.toSeq
+//
+//        getDeclarationsCollection(db).bulkWrite(requests)
+//        logger.info(s"ChangeSet 007. Updated batch no. $idx")
+//    }
 
     logger.info("Applying 'CEDS-2387 Add ID field to /items/packageInformation' db migration... Done.")
   }
@@ -193,6 +202,39 @@ class CacheChangeLog {
 
     itemDocument.updated("packageInformation", packageInformationElemsUpdated)
     new Document(itemDocument)
+  }
+
+  private def migrateWithJavaScript(db: MongoDatabase)(mapFunction: String): Unit = {
+    val originalCollectionName = "declarations"
+    val temporaryCollectionName = "declarations-tmp"
+
+    val reduceFunction =
+      """
+        |function(key, value) {
+        |   return value;
+        |}
+      """.stripMargin
+
+    val mapReduceCommand = new BsonDocument(
+      Seq(
+        new BsonElement("mapreduce", new BsonString(originalCollectionName)),
+        new BsonElement("map", new BsonString(mapFunction)),
+        new BsonElement("reduce", new BsonString(reduceFunction)),
+        new BsonElement("out", new BsonString(temporaryCollectionName))
+      )
+    )
+
+    // TODO: Aggregation is not executing
+    val aggregationPipeline = Seq(
+      new BsonDocument("replaceRoot", new BsonString("value")),
+      new BsonDocument("out", new BsonString(temporaryCollectionName))
+    )
+
+//    val aggregationPipeline = Seq(replaceRoot(new BsonString("value")), out(temporaryCollectionName))
+
+//    db.runCommand(mapReduceCommand)
+    db.getCollection(temporaryCollectionName).aggregate(aggregationPipeline)
+//    db.getCollection(temporaryCollectionName).drop()
   }
 
   private def getDeclarationsCollection(db: MongoDatabase): MongoCollection[Document] = {
