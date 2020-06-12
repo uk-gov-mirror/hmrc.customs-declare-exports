@@ -16,6 +16,7 @@
 
 package integration.uk.gov.hmrc.exports.repositories
 
+import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.util.UUID
 
 import com.codahale.metrics.SharedMetricRegistries
@@ -26,10 +27,13 @@ import play.api.Application
 import play.api.inject.Injector
 import play.api.inject.guice.GuiceApplicationBuilder
 import reactivemongo.core.errors.DatabaseException
-import uk.gov.hmrc.exports.models.Eori
-import uk.gov.hmrc.exports.models.declaration.submissions.{Action, CancellationRequest, Submission, SubmissionRequest}
-import uk.gov.hmrc.exports.repositories.SubmissionRepository
+import stubs.TestMongoDB
+import uk.gov.hmrc.exports.models.{Eori, Page, SubmissionSearch}
+import uk.gov.hmrc.exports.models.declaration.submissions.{Action, CancellationRequest, Submission, SubmissionRequest, SubmissionStatus}
+import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
 import testdata.ExportsTestData._
+import testdata.NotificationTestData
+import testdata.NotificationTestData.notification
 import testdata.SubmissionTestData._
 
 import scala.concurrent.{Await, ExecutionContext}
@@ -38,17 +42,38 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class SubmissionRepositorySpec
     extends WordSpec with BeforeAndAfterEach with ScalaFutures with MustMatchers with OptionValues with IntegrationPatience {
 
+//  override def fakeApplication: Application = {
+//    SharedMetricRegistries.clear()
+//    GuiceApplicationBuilder()
+//      .overrides(bind[Clock].to(clock))
+//      .configure(mongoConfiguration)
+//      .build()
+//  }
+//  private val repo = app.injector.instanceOf[SubmissionRepository]
+
   private val injector: Injector = {
     SharedMetricRegistries.clear()
-    GuiceApplicationBuilder().injector()
+    GuiceApplicationBuilder()
+//      .configure(TestMongoDB.mongoConfiguration)
+      .injector()
   }
   private val repo: SubmissionRepository = injector.instanceOf[SubmissionRepository]
+  private val notificationRepo: NotificationRepository = injector.instanceOf[NotificationRepository]
 
   implicit val ec: ExecutionContext = global
 
   override def beforeEach(): Unit = {
     super.beforeEach()
+
     repo.removeAll().futureValue
+    notificationRepo.removeAll().futureValue
+  }
+
+  override def afterEach(): Unit = {
+    repo.removeAll().futureValue
+    notificationRepo.removeAll().futureValue
+
+    super.afterEach()
   }
 
   "Submission Repository on save" when {
@@ -124,6 +149,25 @@ class SubmissionRepositorySpec
 
   "Submission Repository on addAction" when {
 
+    val action = Action(UUID.randomUUID().toString, SubmissionRequest)
+
+    "there is no submission" should {
+      "return failed future with IllegalStateException" in {
+        an[IllegalStateException] mustBe thrownBy {
+          Await.result(repo.addAction(submission, action), patienceConfig.timeout)
+        }
+      }
+    }
+
+    "there is submission" should {
+      "add action at end of sequence" in {
+        val savedSubmission = repo.save(submission).futureValue
+        repo.addAction(savedSubmission, action).futureValue
+        val result = repo.findSubmissionByUuid(savedSubmission.eori, savedSubmission.uuid).futureValue.value
+        result.actions.map(_.id) must contain(action.id)
+      }
+    }
+
     "there is no Submission with given MRN" should {
       "return empty Option" in {
         val newAction = Action(actionId_2, CancellationRequest)
@@ -140,25 +184,6 @@ class SubmissionRepositorySpec
         val updatedSubmission = repo.addAction(mrn, newAction).futureValue
 
         updatedSubmission.value must equal(expectedUpdatedSubmission)
-      }
-    }
-  }
-
-  "Submission Repository on addAction" when {
-    val action = Action(UUID.randomUUID().toString, SubmissionRequest)
-    "there is no submission" should {
-      "return failed future with IllegalStateException" in {
-        an[IllegalStateException] mustBe thrownBy {
-          Await.result(repo.addAction(submission, action), patienceConfig.timeout)
-        }
-      }
-    }
-    "there is submission" should {
-      "add action at end of sequence" in {
-        val savedSubmission = repo.save(submission).futureValue
-        repo.addAction(savedSubmission, action).futureValue
-        val result = repo.findSubmissionByUuid(savedSubmission.eori, savedSubmission.uuid).futureValue.value
-        result.actions.map(_.id) must contain(action.id)
       }
     }
   }
@@ -215,6 +240,204 @@ class SubmissionRepositorySpec
     }
   }
 
+  "Submission Repository on findAllSubmissions" should {
+
+    "return no Submission" when {
+
+      "there is no Submission matching query" in {
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+
+        repo.findAllSubmissions(query).futureValue mustBe empty
+      }
+
+      "provided with no status" in {
+
+        repo.save(submission)
+        notificationRepo.save(notification)
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq.empty)
+
+        repo.findAllSubmissions(query).futureValue mustBe empty
+      }
+
+      "there is Submission matching eori but not matching status" in {
+
+        repo.save(submission)
+        notificationRepo.save(notification.copy(status = SubmissionStatus.REJECTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+
+        repo.findAllSubmissions(query).futureValue mustBe empty
+      }
+
+      "there is Submission matching status but not matching eori" in {
+
+        repo.save(submission)
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = "GB1234567890", submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+
+        repo.findAllSubmissions(query).futureValue mustBe empty
+      }
+    }
+
+    "return correct Submissions" when {
+
+      "there is single Submission matching query" in {
+
+        repo.save(submission)
+        repo.save(submission_2)
+        repo.save(submission_3)
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+
+        val retrievedSubmissions = repo.findAllSubmissions(query).futureValue
+
+        retrievedSubmissions.size mustBe 1
+        retrievedSubmissions.head mustBe submission
+      }
+
+      "there are multiple Submissions matching query" in {
+
+        repo.save(submission)
+        repo.save(submission_2)
+        repo.save(submission_3)
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_2, status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+
+        val retrievedSubmissions = repo.findAllSubmissions(query).futureValue
+
+        retrievedSubmissions.size mustBe 2
+        retrievedSubmissions must contain(submission)
+        retrievedSubmissions must contain(submission_2)
+      }
+
+      "provided with multiple statuses matching query" in {
+
+        repo.save(submission)
+        repo.save(submission_2)
+        repo.save(submission_3)
+        notificationRepo.save(notification.copy(status = SubmissionStatus.CUSTOMS_POSITION_GRANTED))
+        notificationRepo.save(notification.copy(mrn = mrn_2, status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED, SubmissionStatus.CUSTOMS_POSITION_GRANTED))
+
+        val retrievedSubmissions = repo.findAllSubmissions(query).futureValue
+
+        retrievedSubmissions.size mustBe 2
+        retrievedSubmissions must contain(submission)
+        retrievedSubmissions must contain(submission_2)
+      }
+
+      "provided with status PENDING" in {
+
+        repo.save(submission)
+        repo.save(submission_2)
+        repo.save(submission_3)
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.PENDING))
+
+        val retrievedSubmissions = repo.findAllSubmissions(query).futureValue
+
+        retrievedSubmissions.size mustBe 2
+        retrievedSubmissions must contain(submission_2, submission_3)
+      }
+    }
+
+    "return correct page of results" when {
+
+      val instant1: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(2020, 1, 1, 1, 1), ZoneId.of("UTC"))
+      val instant2: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(2020, 2, 1, 1, 1), ZoneId.of("UTC"))
+      val instant3: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(2020, 3, 1, 1, 1), ZoneId.of("UTC"))
+      def action(timestamp: ZonedDateTime) = Action(requestType = SubmissionRequest, id = actionId, requestTimestamp = timestamp)
+
+      "asked for page no. 1" in {
+
+        repo.save(submission.copy(actions = Seq(action(instant1))))
+        repo.save(submission_2.copy(actions = Seq(action(instant2))))
+        repo.save(submission_3.copy(actions = Seq(action(instant3))))
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_2, status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_3, status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+        val page = Page(index = 1, size = 2)
+
+        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+
+        retrievedSubmissions.size mustBe 2
+        retrievedSubmissions must contain(submission, submission_2)
+      }
+
+      "asked for page no. 2" in {
+
+        repo.save(submission.copy(actions = Seq(action(instant1))))
+        repo.save(submission_2.copy(actions = Seq(action(instant2))))
+        repo.save(submission_3.copy(actions = Seq(action(instant3))))
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_2, status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_3, status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+        val page = Page(index = 1, size = 2)
+
+        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+
+        retrievedSubmissions.size mustBe 1
+        retrievedSubmissions.head mustBe submission_3
+      }
+    }
+
+    "return Submissions sorted" when {
+
+      val instant1: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(2020, 1, 1, 1, 1), ZoneId.of("UTC"))
+      val instant2: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(2020, 2, 1, 1, 1), ZoneId.of("UTC"))
+      val instant3: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(2020, 3, 1, 1, 1), ZoneId.of("UTC"))
+      def action(timestamp: ZonedDateTime) = Action(requestType = SubmissionRequest, id = actionId, requestTimestamp = timestamp)
+
+      "provided with sort by latest action timestamp with ascending order" in {
+
+        repo.save(submission.copy(actions = Seq(action(instant1))))
+        repo.save(submission_2.copy(actions = Seq(action(instant2))))
+        repo.save(submission_3.copy(actions = Seq(action(instant3))))
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_2, status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_3, status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+        val page = Page(index = 1, size = 10)
+
+        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+
+        retrievedSubmissions.size mustBe 3
+        retrievedSubmissions mustBe Seq(submission, submission_2, submission_3)
+      }
+
+      "provided with sort by latest action timestamp with descending order" in {
+
+        repo.save(submission.copy(actions = Seq(action(instant1))))
+        repo.save(submission_2.copy(actions = Seq(action(instant2))))
+        repo.save(submission_3.copy(actions = Seq(action(instant3))))
+        notificationRepo.save(notification.copy(status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_2, status = SubmissionStatus.ACCEPTED))
+        notificationRepo.save(notification.copy(mrn = mrn_3, status = SubmissionStatus.ACCEPTED))
+
+        val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
+        val page = Page(index = 1, size = 10)
+
+        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+
+        retrievedSubmissions.size mustBe 3
+        retrievedSubmissions mustBe Seq(submission_3, submission, submission)
+      }
+    }
+  }
+
   "Submission Repository on findSubmissionByMrn" when {
 
     "there is no Submission with given MRN" should {
@@ -234,7 +457,7 @@ class SubmissionRepositorySpec
     }
   }
 
-  "findSubmissionByUuid" when {
+  "Submission Repository on findSubmissionByUuid" when {
 
     "no matching submission exists" should {
       "return None" in {

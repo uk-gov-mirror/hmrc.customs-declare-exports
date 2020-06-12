@@ -16,18 +16,26 @@
 
 package uk.gov.hmrc.exports.repositories
 
+import java.util.UUID
+
 import javax.inject.{Inject, Singleton}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, Json, OWrites, Reads}
 import play.modules.reactivemongo.ReactiveMongoComponent
 import reactivemongo.api.Cursor.FailOnError
+import reactivemongo.api.FailoverStrategy.default
 import reactivemongo.api.ReadPreference
+import reactivemongo.api.commands.Command
 import reactivemongo.api.indexes.{Index, IndexType}
 import reactivemongo.bson.{BSONBoolean, BSONDocument, BSONObjectID}
-import uk.gov.hmrc.exports.models.Eori
+import reactivemongo.play.json.{ImplicitBSONHandlers, JSONSerializationPack}
+import uk.gov.hmrc.exports.models.declaration.notifications.Notification
 import uk.gov.hmrc.exports.models.declaration.submissions.{Action, Submission}
+import uk.gov.hmrc.exports.models.{DeclarationSort, Eori, Page, SubmissionSearch}
+import uk.gov.hmrc.exports.repositories.SubmissionRepository._
 import uk.gov.hmrc.mongo.ReactiveRepository
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats.objectIdFormats
 
+import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
@@ -54,6 +62,26 @@ class SubmissionRepository @Inject()(implicit mc: ReactiveMongoComponent, ec: Ex
       .sort(Json.obj("actions.requestTimestamp" -> -1))
       .cursor[Submission](ReadPreference.primaryPreferred)
       .collect(maxDocs = -1, FailOnError[Seq[Submission]]())
+  }
+
+  def findAllSubmissions(search: SubmissionSearch, pagination: Option[Page] = None, sort: Option[DeclarationSort] = None): Future[Seq[Submission]] = {
+    def filterBySearch(submissions: List[SubmissionEnhanced]): Seq[SubmissionEnhanced] =
+      submissions.filter { submissionEnhanced =>
+        val notifications = submissionEnhanced.notifications.sorted.reverse
+        submissionEnhanced.eori == search.eori && notifications.headOption.exists(n => search.submissionStatus.contains(n.status))
+      }
+
+    val lookupStage =
+      Json.obj(s"$$lookup" -> Json.obj("from" -> "notifications", "localField" -> "mrn", "foreignField" -> "mrn", "as" -> "notifications"))
+    val aggregateCommand = Json.obj("aggregate" -> "submissions", "pipeline" -> Json.arr(lookupStage), "cursor" -> Json.obj())
+
+    val runner = Command.run(JSONSerializationPack, default)
+
+    runner
+      .apply(collection.db, runner.rawCommand(aggregateCommand)(ImplicitBSONHandlers.JsObjectDocumentWriter))
+      .cursor[SubmissionEnhanced](ReadPreference.primaryPreferred)
+      .collect(-1, FailOnError[List[SubmissionEnhanced]]())
+      .map(filterBySearch(_).map(_.toSubmission))
   }
 
   def findOrCreate(eori: Eori, id: String, onMissing: Submission): Future[Submission] =
@@ -97,4 +125,25 @@ class SubmissionRepository @Inject()(implicit mc: ReactiveMongoComponent, ec: Ex
       }
       updateResult.result[Submission]
     }
+}
+
+object SubmissionRepository {
+
+  private case class SubmissionEnhanced(
+    uuid: String = UUID.randomUUID().toString,
+    eori: String,
+    lrn: String,
+    mrn: Option[String] = None,
+    ducr: String,
+    actions: Seq[Action] = Seq.empty,
+    notifications: Seq[Notification] = Seq.empty
+  ) {
+    def toSubmission: Submission =
+      Submission(uuid = this.uuid, eori = this.eori, lrn = this.lrn, mrn = this.mrn, ducr = this.ducr, actions = this.actions)
+  }
+
+  private object SubmissionEnhanced {
+    implicit val reads: Reads[SubmissionEnhanced] = Json.reads[SubmissionEnhanced]
+    implicit val writes: OWrites[SubmissionEnhanced] = Json.writes[SubmissionEnhanced]
+  }
 }

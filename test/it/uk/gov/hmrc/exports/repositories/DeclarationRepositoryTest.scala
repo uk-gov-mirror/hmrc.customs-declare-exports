@@ -161,7 +161,7 @@ class DeclarationRepositoryTest
   }
 
   "Find with sort order" should {
-    "return the declarations in accending order" in {
+    "return the declarations in ascending order" in {
       val declaration1 = aDeclaration(withUpdateDate(2019, 1, 1))
       val declaration2 = aDeclaration(withUpdateDate(2019, 1, 2))
       val declaration3 = aDeclaration(withUpdateDate(2019, 1, 3))
@@ -172,7 +172,7 @@ class DeclarationRepositoryTest
         .find(DeclarationSearch(eori), page, DeclarationSort(SortBy.UPDATED, SortDirection.ASC))
         .futureValue shouldBe Paginated(Seq(declaration1, declaration2, declaration3), page, 3)
     }
-    "return the declarations in decending order" in {
+    "return the declarations in descending order" in {
       val declaration1 = aDeclaration(withUpdateDate(2019, 1, 1))
       val declaration2 = aDeclaration(withUpdateDate(2019, 1, 2))
       val declaration3 = aDeclaration(withUpdateDate(2019, 1, 3))

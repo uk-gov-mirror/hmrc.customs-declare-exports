@@ -21,7 +21,9 @@ import org.scalatestplus.play.PlaySpec
 class DeclarationSortTest extends PlaySpec {
 
   "DeclarationSort" should {
+
     "bind" when {
+
       "both params populated" in {
         DeclarationSort.bindable
           .bind("sort", Map("sort-by" -> Seq("createdDateTime"), "sort-direction" -> Seq("asc"))) mustBe Some(

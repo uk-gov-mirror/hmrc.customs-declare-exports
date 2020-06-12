@@ -29,7 +29,13 @@ case class Notification(
   status: SubmissionStatus,
   errors: Seq[NotificationError],
   payload: String
-)
+) extends Ordered[Notification] {
+
+  def compare(that: Notification): Int =
+    if (this.dateTimeIssued == that.dateTimeIssued) 0
+    else if (this.dateTimeIssued.isAfter(that.dateTimeIssued)) 1
+    else -1
+}
 
 object Notification {
   implicit val readLocalDateTimeFromString: Reads[ZonedDateTime] = implicitly[Reads[LocalDateTime]]

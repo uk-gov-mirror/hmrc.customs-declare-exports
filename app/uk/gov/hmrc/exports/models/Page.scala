@@ -23,7 +23,7 @@ case class Page(index: Int = Page.DEFAULT_INDEX, size: Int = Page.DEFAULT_SIZE)
 
 object Page {
   val DEFAULT_INDEX = 1
-  val DEFAULT_SIZE = 50
+  val DEFAULT_SIZE = 25
 
   implicit val format: OFormat[Page] = Json.format[Page]
   implicit val bindable: QueryStringBindable[Page] =

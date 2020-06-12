@@ -15,6 +15,7 @@
  */
 
 package uk.gov.hmrc.exports.models
+
 import play.api.libs.json.{Format, Json, OFormat}
 import play.api.mvc.QueryStringBindable
 import uk.gov.hmrc.exports.models.SortBy.SortBy

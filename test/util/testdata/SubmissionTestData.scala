@@ -26,7 +26,7 @@ import uk.gov.hmrc.exports.models.declaration.submissions.{Action, CancellationR
 object SubmissionTestData {
 
   private val instant1971: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(1971, 1, 1, 1, 1), ZoneId.of("UTC"))
-  private val instant1972 = ZonedDateTime.of(LocalDateTime.of(1972, 1, 1, 1, 1), ZoneId.of("UTC"))
+  private val instant1972: ZonedDateTime = ZonedDateTime.of(LocalDateTime.of(1972, 1, 1, 1, 1), ZoneId.of("UTC"))
 
   lazy val action = Action(requestType = SubmissionRequest, id = actionId)
   lazy val action_2 =
@@ -40,7 +40,7 @@ object SubmissionTestData {
   lazy val submission_2: Submission =
     Submission(uuid = uuid_2, eori = eori, lrn = lrn, mrn = Some(mrn_2), ducr = ducr, actions = Seq(action_2))
   lazy val submission_3: Submission =
-    Submission(uuid = uuid_3, eori = eori, lrn = lrn, mrn = Some(mrn_2), ducr = ducr, actions = Seq(action_3))
+    Submission(uuid = uuid_3, eori = eori, lrn = lrn, mrn = Some(mrn_3), ducr = ducr, actions = Seq(action_3))
   lazy val cancelledSubmission: Submission =
     Submission(uuid = uuid, eori = eori, lrn = lrn, mrn = Some(mrn), ducr = ducr, actions = Seq(action, actionCancellation))
   val uuid: String = UUID.randomUUID().toString
