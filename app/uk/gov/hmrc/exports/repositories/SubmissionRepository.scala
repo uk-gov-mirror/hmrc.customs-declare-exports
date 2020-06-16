@@ -23,14 +23,16 @@ import play.api.libs.json.{JsObject, Json, OWrites, Reads}
 import play.modules.reactivemongo.ReactiveMongoComponent
 import reactivemongo.api.Cursor.FailOnError
 import reactivemongo.api.FailoverStrategy.default
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{QueryOpts, ReadConcern, ReadPreference}
 import reactivemongo.api.commands.Command
 import reactivemongo.api.indexes.{Index, IndexType}
 import reactivemongo.bson.{BSONBoolean, BSONDocument, BSONObjectID}
+import reactivemongo.play.json.commands.JSONAggregationFramework
 import reactivemongo.play.json.{ImplicitBSONHandlers, JSONSerializationPack}
+import uk.gov.hmrc.exports.models.declaration.ExportsDeclaration
 import uk.gov.hmrc.exports.models.declaration.notifications.Notification
 import uk.gov.hmrc.exports.models.declaration.submissions.{Action, Submission}
-import uk.gov.hmrc.exports.models.{DeclarationSort, Eori, Page, SubmissionSearch}
+import uk.gov.hmrc.exports.models.{DeclarationSort, Eori, Page, Paginated, SortDirection, SubmissionSearch}
 import uk.gov.hmrc.exports.repositories.SubmissionRepository._
 import uk.gov.hmrc.mongo.ReactiveRepository
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats.objectIdFormats
@@ -82,6 +84,33 @@ class SubmissionRepository @Inject()(implicit mc: ReactiveMongoComponent, ec: Ex
       .cursor[SubmissionEnhanced](ReadPreference.primaryPreferred)
       .collect(-1, FailOnError[List[SubmissionEnhanced]]())
       .map(filterBySearch(_).map(_.toSubmission))
+  }
+
+  def findAllSubmissions_2(search: SubmissionSearch, pagination: Page, sort: DeclarationSort): Future[Seq[Submission]] = {
+    val matchOperator = JSONAggregationFramework.Match(Json.obj("eori" -> search.eori))
+
+    val lookupOperator = JSONAggregationFramework.Lookup(from = "notifications", localField = "mrn", foreignField = "mrn", as = "notifications")
+
+    val sortOperator = JSONAggregationFramework.Sort(sort.direction match {
+      case SortDirection.ASC => JSONAggregationFramework.Ascending(sort.by.toString)
+      case SortDirection.DES => JSONAggregationFramework.Descending(sort.by.toString)
+    })
+
+    for {
+      results <- collection
+        .aggregateWith() { _ =>
+          (matchOperator, List(lookupOperator, sortOperator))
+        }
+
+      //        .sort(Json.obj(sort.by.toString -> sort.direction.id))
+      //        .options(QueryOpts(skipN = (pagination.index - 1) * pagination.size, batchSizeN = pagination.size))
+      //        .cursor[ExportsDeclaration](ReadPreference.primaryPreferred)
+      //        .collect(maxDocs = pagination.size, FailOnError[List[ExportsDeclaration]]())
+      //        .map(_.toSeq)
+      total <- collection.count(Some(query), limit = Some(0), skip = 0, hint = None, readConcern = ReadConcern.Local)
+    } yield {
+      Paginated(currentPageElements = results, page = pagination, total = total)
+    }
   }
 
   def findOrCreate(eori: Eori, id: String, onMissing: Submission): Future[Submission] =

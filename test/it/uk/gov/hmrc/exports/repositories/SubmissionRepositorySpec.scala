@@ -28,7 +28,7 @@ import play.api.inject.Injector
 import play.api.inject.guice.GuiceApplicationBuilder
 import reactivemongo.core.errors.DatabaseException
 import stubs.TestMongoDB
-import uk.gov.hmrc.exports.models.{Eori, Page, SubmissionSearch}
+import uk.gov.hmrc.exports.models.{DeclarationSort, Eori, Page, SubmissionSearch}
 import uk.gov.hmrc.exports.models.declaration.submissions.{Action, CancellationRequest, Submission, SubmissionRequest, SubmissionStatus}
 import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
 import testdata.ExportsTestData._
@@ -368,7 +368,7 @@ class SubmissionRepositorySpec
         val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
         val page = Page(index = 1, size = 2)
 
-        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+        val retrievedSubmissions = repo.findAllSubmissions(query, page).futureValue
 
         retrievedSubmissions.size mustBe 2
         retrievedSubmissions must contain(submission, submission_2)
@@ -386,7 +386,7 @@ class SubmissionRepositorySpec
         val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
         val page = Page(index = 1, size = 2)
 
-        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+        val retrievedSubmissions = repo.findAllSubmissions(query, page).futureValue
 
         retrievedSubmissions.size mustBe 1
         retrievedSubmissions.head mustBe submission_3
@@ -411,8 +411,9 @@ class SubmissionRepositorySpec
 
         val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
         val page = Page(index = 1, size = 10)
+        val sort = DeclarationSort()
 
-        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+        val retrievedSubmissions = repo.findAllSubmissions(query, page, sort).futureValue
 
         retrievedSubmissions.size mustBe 3
         retrievedSubmissions mustBe Seq(submission, submission_2, submission_3)
@@ -430,7 +431,7 @@ class SubmissionRepositorySpec
         val query = SubmissionSearch(eori = eori, submissionStatus = Seq(SubmissionStatus.ACCEPTED))
         val page = Page(index = 1, size = 10)
 
-        val retrievedSubmissions = repo.findAllSubmissions(query, Some(page)).futureValue
+        val retrievedSubmissions = repo.findAllSubmissions(query, page, sort).futureValue
 
         retrievedSubmissions.size mustBe 3
         retrievedSubmissions mustBe Seq(submission_3, submission, submission)
