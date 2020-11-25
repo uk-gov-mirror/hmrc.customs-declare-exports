@@ -109,6 +109,17 @@ class DeclarationRepository @Inject()(mc: ReactiveMongoComponent, appConfig: App
       }
   }
 
+  def markCompleted(declaration: ExportsDeclaration): Future[Option[ExportsDeclaration]] = {
+    super
+      .findAndUpdate(
+        Json.obj("id" -> declaration.id, "eori" -> declaration.eori),
+        Json.toJson(declaration.copy(status = DeclarationStatus.COMPLETE)).as[JsObject],
+        fetchNewObject = false,
+        upsert = false
+      )
+      .map(_.value.map(_.as[ExportsDeclaration]))
+  }
+
   def delete(declaration: ExportsDeclaration): Future[Unit] =
     super
       .remove("id" -> declaration.id, "eori" -> declaration.eori)

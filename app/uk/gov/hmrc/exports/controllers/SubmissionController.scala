@@ -21,6 +21,7 @@ import play.api.mvc._
 import uk.gov.hmrc.exports.controllers.actions.Authenticator
 import uk.gov.hmrc.exports.controllers.response.ErrorResponse
 import uk.gov.hmrc.exports.controllers.util.HeaderValidator
+import uk.gov.hmrc.exports.repositories.DeclarationRepository
 import uk.gov.hmrc.exports.services.{DeclarationService, SubmissionService}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -31,17 +32,24 @@ class SubmissionController @Inject()(
   submissionService: SubmissionService,
   declarationService: DeclarationService,
   headerValidator: HeaderValidator,
-  cc: ControllerComponents
+  cc: ControllerComponents,
+  declarationRepository: DeclarationRepository
 )(implicit executionContext: ExecutionContext)
     extends RESTController(cc) with JSONResponses {
 
   def create(id: String): Action[Unit] = authenticator.authorisedAction(parse.empty) { implicit request =>
     declarationService.findOne(id, request.eori).flatMap {
       case Some(declaration) =>
-        if (declaration.isCompleted) {
-          Future.successful(Conflict(ErrorResponse("Declaration has already been submitted")))
-        } else {
-          submissionService.submit(declaration).map(Created(_))
+        declarationRepository.markCompleted(declaration).flatMap {
+          case Some(declarationBeforeUpdate) =>
+
+            if (declarationBeforeUpdate.isCompleted) {
+              Future.successful(Conflict(ErrorResponse("Declaration has already been submitted")))
+            } else {
+              submissionService.submit(declaration).map(Created(_))
+            }
+
+          case None => Future.successful(NotFound)
         }
       case None => Future.successful(NotFound)
     }

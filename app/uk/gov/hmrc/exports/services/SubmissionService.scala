@@ -55,11 +55,8 @@ class SubmissionService @Inject()(
       .getOrElse(throw new IllegalArgumentException("A DUCR is required"))
     val payload = wcoMapperService.toXml(metaData)
 
+    logProgress(declaration, "Submitting to the Declaration API")
     for {
-      // Update the Declaration Status
-      _ <- declarationRepository.update(declaration.copy(status = DeclarationStatus.COMPLETE))
-      _ = logProgress(declaration, "Marked as COMPLETE")
-
       // Create the Submission
       submission <- submissionRepository.findOrCreate(Eori(declaration.eori), declaration.id, Submission(declaration, lrn, ducr))
       _ = logProgress(declaration, "Found/Created Submission")
