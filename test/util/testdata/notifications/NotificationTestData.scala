@@ -25,7 +25,7 @@ import play.api.mvc.Codec
 import testdata.ExportsTestData.{actionId, actionId_2, actionId_4, mrn}
 import testdata.TestDataHelper
 import uk.gov.hmrc.exports.controllers.util.CustomsHeaderNames
-import uk.gov.hmrc.exports.models.declaration.notifications.{Notification, NotificationDetails, NotificationError}
+import uk.gov.hmrc.exports.models.declaration.notifications.{NotificationDetails, NotificationError}
 import uk.gov.hmrc.exports.models.declaration.submissions.SubmissionStatus
 import uk.gov.hmrc.exports.models.{Pointer, PointerSection, PointerSectionType}
 

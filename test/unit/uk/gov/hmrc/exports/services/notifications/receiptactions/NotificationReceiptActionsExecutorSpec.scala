@@ -23,7 +23,7 @@ import org.mockito.ArgumentMatchersSugar.{any, eqTo}
 import org.mockito.Mockito
 import testdata.notifications.NotificationTestData.notification
 import uk.gov.hmrc.exports.base.UnitSpec
-import uk.gov.hmrc.exports.models.declaration.notifications.Notification
+import uk.gov.hmrc.exports.models.declaration.notifications.ParsedNotification
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -59,7 +59,7 @@ class NotificationReceiptActionsExecutorSpec extends UnitSpec {
     "all actions work correctly" should {
 
       "call scheduler with zero delay" in {
-        when(parseAndSaveAction.execute(any[Notification])).thenReturn(Future.successful((): Unit))
+        when(parseAndSaveAction.execute(any[ParsedNotification])).thenReturn(Future.successful((): Unit))
         when(sendEmailForDmsDocAction.execute(any[String])).thenReturn(Future.successful((): Unit))
 
         notificationReceiptActionsExecutor.executeActions(notification)
@@ -69,7 +69,7 @@ class NotificationReceiptActionsExecutorSpec extends UnitSpec {
       }
 
       "call actions in order" in {
-        when(parseAndSaveAction.execute(any[Notification])).thenReturn(Future.successful((): Unit))
+        when(parseAndSaveAction.execute(any[ParsedNotification])).thenReturn(Future.successful((): Unit))
         when(sendEmailForDmsDocAction.execute(any[String])).thenReturn(Future.successful((): Unit))
 
         notificationReceiptActionsExecutor.executeActions(notification)
@@ -84,7 +84,7 @@ class NotificationReceiptActionsExecutorSpec extends UnitSpec {
 
       "call scheduler with zero delay" in {
         val testException = new RuntimeException("Test exception message")
-        when(parseAndSaveAction.execute(any[Notification])).thenReturn(Future.failed(testException))
+        when(parseAndSaveAction.execute(any[ParsedNotification])).thenReturn(Future.failed(testException))
 
         notificationReceiptActionsExecutor.executeActions(notification)
 
@@ -94,7 +94,7 @@ class NotificationReceiptActionsExecutorSpec extends UnitSpec {
 
       "not call SendEmailForDmsDocAction" in {
         val testException = new RuntimeException("Test exception message")
-        when(parseAndSaveAction.execute(any[Notification])).thenReturn(Future.failed(testException))
+        when(parseAndSaveAction.execute(any[ParsedNotification])).thenReturn(Future.failed(testException))
 
         notificationReceiptActionsExecutor.executeActions(notification)
 

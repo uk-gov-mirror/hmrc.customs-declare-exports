@@ -18,19 +18,19 @@ package matchers
 
 import org.scalatest.matchers.{MatchResult, Matcher}
 import reactivemongo.bson.BSONObjectID
-import uk.gov.hmrc.exports.models.declaration.notifications.Notification
+import uk.gov.hmrc.exports.models.declaration.notifications.ParsedNotification
 
 object NotificationMatchers {
 
-  def equalWithoutId(notification: Notification): Matcher[Notification] = new Matcher[Notification] {
-    def actualContentWas(notif: Notification): String =
+  def equalWithoutId(notification: ParsedNotification): Matcher[ParsedNotification] = new Matcher[ParsedNotification] {
+    def actualContentWas(notif: ParsedNotification): String =
       if (notif == null) {
         "Element did not exist"
       } else {
         s"\nActual content is:\n${notif}\n"
       }
 
-    override def apply(left: Notification): MatchResult = {
+    override def apply(left: ParsedNotification): MatchResult = {
       def compare: Boolean = {
         val id = BSONObjectID.generate()
         val leftNoId = left.copy(id = id)

@@ -17,7 +17,7 @@
 package uk.gov.hmrc.exports.services.notifications
 
 import javax.inject.{Inject, Singleton}
-import uk.gov.hmrc.exports.models.declaration.notifications.Notification
+import uk.gov.hmrc.exports.models.declaration.notifications.{ParsedNotification, UnparsedNotification}
 import uk.gov.hmrc.exports.models.declaration.submissions.Submission
 import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
 import uk.gov.hmrc.exports.services.notifications.receiptactions._
@@ -34,16 +34,13 @@ class NotificationService @Inject()(
   notificationReceiptActionsExecutor: NotificationReceiptActionsExecutor
 )(implicit executionContext: ExecutionContext) {
 
-  def getNotifications(submission: Submission): Future[Seq[Notification]] = {
+  def getNotifications(submission: Submission): Future[Seq[ParsedNotification]] = {
 
-    def updateErrorUrls(notification: Notification): Notification = {
-      val updatedDetails = notification.details.map(
-        details =>
-          details.copy(errors = details.errors.map { error =>
-            val url = error.pointer.flatMap(WCOPointerMappingService.getUrlBasedOnErrorPointer)
-            error.addUrl(url)
-          })
-      )
+    def updateErrorUrls(notification: ParsedNotification): ParsedNotification = {
+      val updatedDetails = notification.details.copy(errors = notification.details.errors.map { error =>
+        val url = error.pointer.flatMap(WCOPointerMappingService.getUrlBasedOnErrorPointer)
+        error.addUrl(url)
+      })
 
       notification.copy(details = updatedDetails)
     }
@@ -52,7 +49,7 @@ class NotificationService @Inject()(
     notificationRepository.findNotificationsByActionIds(conversationIds).map(_.map(updateErrorUrls))
   }
 
-  def getAllNotificationsForUser(eori: String): Future[Seq[Notification]] =
+  def getAllNotificationsForUser(eori: String): Future[Seq[ParsedNotification]] =
     submissionRepository.findAllSubmissionsForEori(eori).flatMap {
       case Seq() => Future.successful(Seq.empty)
       case submissions =>
@@ -65,7 +62,7 @@ class NotificationService @Inject()(
     }
 
   def handleNewNotification(actionId: String, notificationXml: NodeSeq)(implicit hc: HeaderCarrier): Future[Unit] = {
-    val notification = Notification.unparsed(actionId, notificationXml)
+    val notification: UnparsedNotification = UnparsedNotification(actionId = actionId, payload = notificationXml.toString)
 
     notificationRepository.insert(notification).map { _ =>
       notificationReceiptActionsExecutor.executeActions(notification)

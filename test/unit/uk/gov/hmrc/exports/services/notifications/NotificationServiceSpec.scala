@@ -32,7 +32,7 @@ import testdata.notifications.ExampleXmlAndNotificationDetailsPair._
 import testdata.notifications.NotificationTestData._
 import uk.gov.hmrc.exports.base.UnitSpec
 import uk.gov.hmrc.exports.base.UnitTestMockBuilder._
-import uk.gov.hmrc.exports.models.declaration.notifications.{Notification, NotificationDetails}
+import uk.gov.hmrc.exports.models.declaration.notifications.{NotificationDetails, ParsedNotification}
 import uk.gov.hmrc.exports.models.declaration.submissions.{Action, Submission, SubmissionRequest, SubmissionStatus}
 import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
 import uk.gov.hmrc.exports.services.notifications.receiptactions.NotificationReceiptActionsExecutor
@@ -65,7 +65,7 @@ class NotificationServiceSpec extends UnitSpec with IntegrationPatience {
     when(notificationFactory.buildNotifications(any, any)).thenReturn(Seq(notification))
     when(notificationRepository.insert(any)(any)).thenReturn(Future.successful(dummyWriteResultSuccess))
     when(submissionRepository.updateMrn(any, any)).thenReturn(Future.successful(Some(submission)))
-    when(notificationReceiptActionsExecutor.executeActions(any[Notification])).thenReturn(Cancellable.alreadyCancelled)
+    when(notificationReceiptActionsExecutor.executeActions(any[ParsedNotification])).thenReturn(Cancellable.alreadyCancelled)
   }
 
   override def afterEach(): Unit = {
@@ -179,7 +179,7 @@ class NotificationServiceSpec extends UnitSpec with IntegrationPatience {
 
         notificationService.handleNewNotification(actionId, inputXml).futureValue
 
-        val captor: ArgumentCaptor[Notification] = ArgumentCaptor.forClass(classOf[Notification])
+        val captor: ArgumentCaptor[ParsedNotification] = ArgumentCaptor.forClass(classOf[ParsedNotification])
         verify(notificationRepository).insert(captor.capture())(any)
 
         captor.getValue must equalWithoutId(testNotificationUnparsed)
@@ -189,7 +189,7 @@ class NotificationServiceSpec extends UnitSpec with IntegrationPatience {
 
         notificationService.handleNewNotification(actionId, inputXml).futureValue
 
-        val captor: ArgumentCaptor[Notification] = ArgumentCaptor.forClass(classOf[Notification])
+        val captor: ArgumentCaptor[ParsedNotification] = ArgumentCaptor.forClass(classOf[ParsedNotification])
         verify(notificationReceiptActionsExecutor).executeActions(captor.capture())
 
         captor.getValue must equalWithoutId(testNotificationUnparsed)
@@ -262,7 +262,7 @@ class NotificationServiceSpec extends UnitSpec with IntegrationPatience {
         val testNotification = Notification(actionId = actionId, payload = exampleUnparsableNotification(mrn).asXml.toString, details = None)
         when(notificationRepository.findUnparsedNotifications()).thenReturn(Future.successful(Seq(testNotification)))
         val exceptionMsg = "Test Exception message"
-        when(notificationReceiptActionsExecutor.executeActions(any[Notification])).thenThrow(new RuntimeException(exceptionMsg))
+        when(notificationReceiptActionsExecutor.executeActions(any[ParsedNotification])).thenThrow(new RuntimeException(exceptionMsg))
 
         notificationService.reattemptParsingUnparsedNotifications().failed.futureValue must have message exceptionMsg
       }

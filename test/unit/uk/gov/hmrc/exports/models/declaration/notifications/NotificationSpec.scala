@@ -45,7 +45,7 @@ class NotificationSpec extends UnitSpec {
     )
 
     "have json writes that produce object which could be parsed by the front end service" in {
-      val json = Json.toJson(notification)(Notification.FrontendFormat.writes)
+      val json = Json.toJson(notification)(ParsedNotification.FrontendFormat.writes)
 
       json.toString() mustBe NotificationSpec.serialisedWithNonOptionalDetailsFormat(
         actionId,
@@ -56,7 +56,7 @@ class NotificationSpec extends UnitSpec {
     }
 
     "have json writes that produce object which could be parsed by the database" in {
-      val json = Json.toJson(notification)(Notification.DbFormat.writes)
+      val json = Json.toJson(notification)(ParsedNotification.DbFormat.writes)
 
       json.toString() mustBe NotificationSpec.serialisedWithOptionalDetailsFormat(
         id.stringify,
@@ -74,21 +74,21 @@ class NotificationSpec extends UnitSpec {
 
     "return Notification with actionId" in {
 
-      val result = Notification.unparsed(actionId, xml)
+      val result = ParsedNotification.unparsed(actionId, xml)
 
       result.actionId mustBe actionId
     }
 
     "return Notification with payload" in {
 
-      val result = Notification.unparsed(actionId, xml)
+      val result = ParsedNotification.unparsed(actionId, xml)
 
       result.payload mustBe xml.toString
     }
 
     "return Notification with empty details" in {
 
-      val result = Notification.unparsed(actionId, xml)
+      val result = ParsedNotification.unparsed(actionId, xml)
 
       result.details mustBe empty
     }

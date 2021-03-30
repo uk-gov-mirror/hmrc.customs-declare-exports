@@ -25,7 +25,7 @@ import testdata.SubmissionTestData.submission
 import testdata.notifications.ExampleXmlAndNotificationDetailsPair._
 import testdata.notifications.NotificationTestData.notification
 import uk.gov.hmrc.exports.base.UnitSpec
-import uk.gov.hmrc.exports.models.declaration.notifications.Notification
+import uk.gov.hmrc.exports.models.declaration.notifications.ParsedNotification
 import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
 import uk.gov.hmrc.exports.services.notifications.NotificationFactory
 
@@ -78,7 +78,7 @@ class ParseAndSaveActionSpec extends UnitSpec {
 
           val inOrder: InOrder = Mockito.inOrder(notificationFactory, notificationRepository, submissionRepository)
           inOrder.verify(notificationFactory).buildNotifications(any[String], any[String])
-          inOrder.verify(notificationRepository).insert(any[Notification])(any)
+          inOrder.verify(notificationRepository).insert(any[ParsedNotification])(any)
           inOrder.verify(submissionRepository).updateMrn(any[String], any[String])
           inOrder.verify(notificationRepository).removeUnparsedNotificationsForActionId(any[String])
         }
@@ -137,7 +137,7 @@ class ParseAndSaveActionSpec extends UnitSpec {
 
           val inOrder: InOrder = Mockito.inOrder(notificationFactory, notificationRepository, submissionRepository)
           inOrder.verify(notificationFactory).buildNotifications(any[String], any[String])
-          inOrder.verify(notificationRepository, times(2)).insert(any[Notification])(any)
+          inOrder.verify(notificationRepository, times(2)).insert(any[ParsedNotification])(any)
           inOrder.verify(submissionRepository, times(2)).updateMrn(any[String], any[String])
           inOrder.verify(notificationRepository).removeUnparsedNotificationsForActionId(any[String])
         }
