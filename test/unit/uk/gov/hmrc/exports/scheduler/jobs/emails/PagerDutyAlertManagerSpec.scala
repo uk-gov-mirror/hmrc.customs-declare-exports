@@ -23,7 +23,7 @@ import testdata.WorkItemTestData._
 import uk.gov.hmrc.exports.base.UnitSpec
 import uk.gov.hmrc.exports.config.AppConfig
 import uk.gov.hmrc.exports.models.emails.SendEmailDetails
-import uk.gov.hmrc.exports.repositories.SendEmailWorkItemRepository
+import uk.gov.hmrc.exports.repositories.UnparsedNotificationWorkItemRepository
 import uk.gov.hmrc.workitem.{Failed, WorkItem}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class PagerDutyAlertManagerSpec extends UnitSpec {
 
   private val appConfig = mock[AppConfig]
-  private val sendEmailWorkItemRepository = mock[SendEmailWorkItemRepository]
+  private val sendEmailWorkItemRepository = mock[UnparsedNotificationWorkItemRepository]
   private val pagerDutyAlertValidator = mock[PagerDutyAlertValidator]
 
   private val pagerDutyAlertManager = new PagerDutyAlertManager(appConfig, sendEmailWorkItemRepository, pagerDutyAlertValidator)
@@ -47,7 +47,7 @@ class PagerDutyAlertManagerSpec extends UnitSpec {
 
   "PagerDutyAlertManager on managePagerDutyAlert" when {
 
-    "SendEmailWorkItemRepository returns empty Option" should {
+    "UnparsedNotificationWorkItemRepository returns empty Option" should {
 
       "return false" in {
         when(sendEmailWorkItemRepository.findById(any[BSONObjectID], any[ReadPreference])(any[ExecutionContext])).thenReturn(Future.successful(None))
@@ -65,7 +65,7 @@ class PagerDutyAlertManagerSpec extends UnitSpec {
         verifyZeroInteractions(pagerDutyAlertValidator)
       }
 
-      "NOT call SendEmailWorkItemRepository.markAlertTriggered" in {
+      "NOT call UnparsedNotificationWorkItemRepository.markAlertTriggered" in {
         when(sendEmailWorkItemRepository.findById(any[BSONObjectID], any[ReadPreference])(any[ExecutionContext])).thenReturn(Future.successful(None))
         val id = BSONObjectID.generate
 
@@ -75,7 +75,7 @@ class PagerDutyAlertManagerSpec extends UnitSpec {
       }
     }
 
-    "SendEmailWorkItemRepository returns WorkItem" should {
+    "UnparsedNotificationWorkItemRepository returns WorkItem" should {
       "call PagerDutyAlertValidator" in {
         when(sendEmailWorkItemRepository.findById(any[BSONObjectID], any[ReadPreference])(any[ExecutionContext]))
           .thenReturn(Future.successful(Some(testWorkItem)))
@@ -87,7 +87,7 @@ class PagerDutyAlertManagerSpec extends UnitSpec {
       }
     }
 
-    "SendEmailWorkItemRepository returns WorkItem" when {
+    "UnparsedNotificationWorkItemRepository returns WorkItem" when {
 
       "PagerDutyAlertValidator returns false" should {
 
@@ -100,7 +100,7 @@ class PagerDutyAlertManagerSpec extends UnitSpec {
           pagerDutyAlertManager.managePagerDutyAlert(id).futureValue mustBe false
         }
 
-        "NOT call SendEmailWorkItemRepository.markAlertTriggered" in {
+        "NOT call UnparsedNotificationWorkItemRepository.markAlertTriggered" in {
           when(sendEmailWorkItemRepository.findById(any[BSONObjectID], any[ReadPreference])(any[ExecutionContext]))
             .thenReturn(Future.successful(Some(testWorkItem)))
           when(pagerDutyAlertValidator.isPagerDutyAlertRequiredFor(any[WorkItem[SendEmailDetails]])).thenReturn(false)
@@ -127,7 +127,7 @@ class PagerDutyAlertManagerSpec extends UnitSpec {
           pagerDutyAlertManager.managePagerDutyAlert(id).futureValue mustBe true
         }
 
-        "call SendEmailWorkItemRepository.markAlertTriggered" in {
+        "call UnparsedNotificationWorkItemRepository.markAlertTriggered" in {
           when(sendEmailWorkItemRepository.findById(any[BSONObjectID], any[ReadPreference])(any[ExecutionContext]))
             .thenReturn(Future.successful(Some(testWorkItem)))
           when(pagerDutyAlertValidator.isPagerDutyAlertRequiredFor(any[WorkItem[SendEmailDetails]])).thenReturn(true)

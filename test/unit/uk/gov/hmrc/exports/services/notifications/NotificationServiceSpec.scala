@@ -34,7 +34,7 @@ import uk.gov.hmrc.exports.base.UnitSpec
 import uk.gov.hmrc.exports.base.UnitTestMockBuilder._
 import uk.gov.hmrc.exports.models.declaration.notifications.{NotificationDetails, ParsedNotification}
 import uk.gov.hmrc.exports.models.declaration.submissions.{Action, Submission, SubmissionRequest, SubmissionStatus}
-import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
+import uk.gov.hmrc.exports.repositories.{ParsedNotificationRepository, SubmissionRepository}
 import uk.gov.hmrc.exports.services.notifications.receiptactions.NotificationReceiptActionsExecutor
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -45,7 +45,7 @@ class NotificationServiceSpec extends UnitSpec with IntegrationPatience {
 
   private implicit val hc: HeaderCarrier = mock[HeaderCarrier]
   private val submissionRepository: SubmissionRepository = buildSubmissionRepositoryMock
-  private val notificationRepository: NotificationRepository = buildNotificationRepositoryMock
+  private val notificationRepository: ParsedNotificationRepository = buildNotificationRepositoryMock
   private val notificationFactory: NotificationFactory = mock[NotificationFactory]
   private val notificationReceiptActionsExecutor: NotificationReceiptActionsExecutor = mock[NotificationReceiptActionsExecutor]
 

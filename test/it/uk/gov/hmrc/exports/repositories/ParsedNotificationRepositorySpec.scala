@@ -25,9 +25,9 @@ import uk.gov.hmrc.exports.base.IntegrationTestBaseSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class NotificationRepositorySpec extends IntegrationTestBaseSpec {
+class ParsedNotificationRepositorySpec extends IntegrationTestBaseSpec {
 
-  private val repo = GuiceApplicationBuilder().configure(mongoConfiguration).injector.instanceOf[NotificationRepository]
+  private val repo = GuiceApplicationBuilder().configure(mongoConfiguration).injector.instanceOf[ParsedNotificationRepository]
 
   override def beforeEach(): Unit = {
     super.beforeEach()

@@ -17,21 +17,25 @@
 package uk.gov.hmrc.exports.repositories
 
 import javax.inject.{Inject, Singleton}
-import play.api.libs.json.{JsNull, JsString, Json}
+import play.api.libs.json.{JsString, Json}
 import play.modules.reactivemongo.ReactiveMongoComponent
-import reactivemongo.api.commands.WriteResult
 import reactivemongo.api.indexes.{Index, IndexType}
-import reactivemongo.bson.{BSONDocument, BSONNull, BSONObjectID}
+import reactivemongo.bson.BSONObjectID
 import reactivemongo.play.json.collection.JSONCollection
-import uk.gov.hmrc.exports.models.declaration.notifications.{Notification, ParsedNotification, UnparsedNotification}
+import uk.gov.hmrc.exports.models.declaration.notifications.ParsedNotification
 import uk.gov.hmrc.mongo.ReactiveRepository
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats.objectIdFormats
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class NotificationRepository @Inject()(mc: ReactiveMongoComponent)(implicit ec: ExecutionContext)
-    extends ReactiveRepository[Notification, BSONObjectID]("notifications", mc.mongoConnector.db, Notification.DbFormat.format, objectIdFormats) {
+class ParsedNotificationRepository @Inject()(mc: ReactiveMongoComponent)(implicit ec: ExecutionContext)
+    extends ReactiveRepository[ParsedNotification, BSONObjectID](
+      "notifications",
+      mc.mongoConnector.db,
+      ParsedNotification.DbFormat.format,
+      objectIdFormats
+    ) {
 
   override lazy val collection: JSONCollection =
     mongo().collection[JSONCollection](collectionName, failoverStrategy = RepositorySettings.failoverStrategy)
@@ -39,32 +43,17 @@ class NotificationRepository @Inject()(mc: ReactiveMongoComponent)(implicit ec: 
   override def indexes: Seq[Index] = Seq(
     Index(Seq("details.dateTimeIssued" -> IndexType.Ascending), name = Some("detailsDateTimeIssuedIdx")),
     Index(Seq("details.mrn" -> IndexType.Ascending), name = Some("detailsMrnIdx")),
-    Index(Seq("actionId" -> IndexType.Ascending), name = Some("actionIdIdx")),
-    Index(Seq("details" -> IndexType.Ascending), name = Some("detailsDocMissingIdx"), partialFilter = Some(BSONDocument("details" -> BSONNull)))
+    Index(Seq("actionId" -> IndexType.Ascending), name = Some("actionIdIdx"))
+//    Index(Seq("details" -> IndexType.Ascending), name = Some("detailsDocMissingIdx"), partialFilter = Some(BSONDocument("details" -> BSONNull)))
   )
 
   def findNotificationsByActionId(actionId: String): Future[Seq[ParsedNotification]] =
-    find("actionId" -> JsString(actionId)).map(toParsedNotifications)
+    find("actionId" -> JsString(actionId))
 
   def findNotificationsByActionIds(actionIds: Seq[String]): Future[Seq[ParsedNotification]] =
     actionIds match {
       case Seq() => Future.successful(Seq.empty)
-      case _     => find("$or" -> actionIds.map(id => Json.obj("actionId" -> JsString(id)))).map(toParsedNotifications)
+      case _     => find("$or" -> actionIds.map(id => Json.obj("actionId" -> JsString(id))))
     }
 
-  def findUnparsedNotifications(): Future[Seq[UnparsedNotification]] =
-    find("details" -> JsNull).map(toUnparsedNotifications)
-
-  def removeUnparsedNotificationsForActionId(actionId: String): Future[WriteResult] =
-    remove("actionId" -> JsString(actionId), "details" -> JsNull)
-
-  private def toParsedNotifications(notifications: Seq[Notification]) = notifications match {
-    case notifications: List[ParsedNotification] => notifications
-    case _ => Seq.empty
-  }
-
-  private def toUnparsedNotifications(notifications: Seq[Notification]) = notifications match {
-    case notifications: List[UnparsedNotification] => notifications
-    case _ => Seq.empty
-  }
 }

@@ -32,14 +32,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class SendEmailWorkItemRepositorySpec extends IntegrationTestBaseSpec {
 
-  private val repo = GuiceApplicationBuilder().configure(mongoConfiguration).injector.instanceOf[SendEmailWorkItemRepository]
+  private val repo = GuiceApplicationBuilder().configure(mongoConfiguration).injector.instanceOf[UnparsedNotificationWorkItemRepository]
 
   override def beforeEach(): Unit = {
     super.beforeEach()
     repo.removeAll().futureValue
   }
 
-  "SendEmailWorkItemRepository on pushNew" should {
+  "UnparsedNotificationWorkItemRepository on pushNew" should {
 
     "create a new WorkItem that is ready to be pulled immediately" in {
 
@@ -73,7 +73,7 @@ class SendEmailWorkItemRepositorySpec extends IntegrationTestBaseSpec {
     }
   }
 
-  "SendEmailWorkItemRepository on pullOutstanding" should {
+  "UnparsedNotificationWorkItemRepository on pullOutstanding" should {
 
     "return empty Option" when {
 
@@ -170,7 +170,7 @@ class SendEmailWorkItemRepositorySpec extends IntegrationTestBaseSpec {
     }
   }
 
-  "SendEmailWorkItemRepository on updateAlertTriggered" when {
+  "UnparsedNotificationWorkItemRepository on updateAlertTriggered" when {
 
     "provided with existing ID parameter" should {
 

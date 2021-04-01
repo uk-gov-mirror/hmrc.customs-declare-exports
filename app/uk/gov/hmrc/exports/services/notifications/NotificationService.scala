@@ -19,9 +19,8 @@ package uk.gov.hmrc.exports.services.notifications
 import javax.inject.{Inject, Singleton}
 import uk.gov.hmrc.exports.models.declaration.notifications.{ParsedNotification, UnparsedNotification}
 import uk.gov.hmrc.exports.models.declaration.submissions.Submission
-import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
+import uk.gov.hmrc.exports.repositories.{ParsedNotificationRepository, SubmissionRepository, UnparsedNotificationRepository}
 import uk.gov.hmrc.exports.services.notifications.receiptactions._
-import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.NodeSeq
@@ -29,7 +28,8 @@ import scala.xml.NodeSeq
 @Singleton
 class NotificationService @Inject()(
   submissionRepository: SubmissionRepository,
-  notificationRepository: NotificationRepository,
+  notificationRepository: ParsedNotificationRepository,
+  unparsedNotificationRepository: UnparsedNotificationRepository,
   notificationFactory: NotificationFactory,
   notificationReceiptActionsExecutor: NotificationReceiptActionsExecutor
 )(implicit executionContext: ExecutionContext) {
@@ -61,15 +61,15 @@ class NotificationService @Inject()(
         notificationRepository.findNotificationsByActionIds(conversationIds)
     }
 
-  def handleNewNotification(actionId: String, notificationXml: NodeSeq)(implicit hc: HeaderCarrier): Future[Unit] = {
+  def handleNewNotification(actionId: String, notificationXml: NodeSeq): Future[Unit] = {
     val notification: UnparsedNotification = UnparsedNotification(actionId = actionId, payload = notificationXml.toString)
 
-    notificationRepository.insert(notification).map { _ =>
+    unparsedNotificationRepository.insert(notification).map { _ =>
       notificationReceiptActionsExecutor.executeActions(notification)
     }
   }
 
   def reattemptParsingUnparsedNotifications(): Future[Unit] =
-    notificationRepository.findUnparsedNotifications().map(_.map(notificationReceiptActionsExecutor.executeActions))
+    unparsedNotificationRepository.findAll().map(_.map(notificationReceiptActionsExecutor.executeActions))
 
 }

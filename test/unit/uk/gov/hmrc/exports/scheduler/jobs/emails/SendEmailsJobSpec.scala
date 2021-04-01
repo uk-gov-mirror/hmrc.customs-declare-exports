@@ -26,7 +26,7 @@ import uk.gov.hmrc.exports.base.UnitSpec
 import uk.gov.hmrc.exports.config.AppConfig
 import uk.gov.hmrc.exports.models.emails.SendEmailDetails
 import uk.gov.hmrc.exports.models.emails.SendEmailResult.{BadEmailRequest, EmailAccepted, InternalEmailServiceError, MissingData}
-import uk.gov.hmrc.exports.repositories.SendEmailWorkItemRepository
+import uk.gov.hmrc.exports.repositories.UnparsedNotificationWorkItemRepository
 import uk.gov.hmrc.exports.services.email.EmailSender
 import uk.gov.hmrc.workitem._
 
@@ -37,7 +37,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class SendEmailsJobSpec extends UnitSpec {
 
   private val appConfig = mock[AppConfig]
-  private val sendEmailWorkItemRepository = mock[SendEmailWorkItemRepository]
+  private val sendEmailWorkItemRepository = mock[UnparsedNotificationWorkItemRepository]
   private val emailSender = mock[EmailSender]
   private val pagerDutyAlertManager = mock[PagerDutyAlertManager]
 
@@ -89,7 +89,7 @@ class SendEmailsJobSpec extends UnitSpec {
 
   "SendEmailsJob on execute" when {
 
-    "SendEmailWorkItemRepository returns empty Option" should {
+    "UnparsedNotificationWorkItemRepository returns empty Option" should {
 
       "return successful Future" in {
         when(sendEmailWorkItemRepository.pullOutstanding(any[DateTime], any[DateTime])(any[ExecutionContext])).thenReturn(Future.successful(None))
@@ -114,7 +114,7 @@ class SendEmailsJobSpec extends UnitSpec {
       }
     }
 
-    "SendEmailWorkItemRepository returns WorkItem" when {
+    "UnparsedNotificationWorkItemRepository returns WorkItem" when {
 
       val testWorkItem: WorkItem[SendEmailDetails] = buildTestWorkItem(status = InProgress)
 
@@ -131,7 +131,7 @@ class SendEmailsJobSpec extends UnitSpec {
             .thenReturn(Future.successful(true))
         }
 
-        "call SendEmailWorkItemRepository to complete the WorkItem" in {
+        "call UnparsedNotificationWorkItemRepository to complete the WorkItem" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -139,7 +139,7 @@ class SendEmailsJobSpec extends UnitSpec {
           verify(sendEmailWorkItemRepository).complete(eqTo(testWorkItem.id), eqTo(Succeeded))(any)
         }
 
-        "call SendEmailWorkItemRepository again for the next WorkItem" in {
+        "call UnparsedNotificationWorkItemRepository again for the next WorkItem" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -166,7 +166,7 @@ class SendEmailsJobSpec extends UnitSpec {
             .thenReturn(Future.successful(true))
         }
 
-        "call SendEmailWorkItemRepository to mark the WorkItem as Failed" in {
+        "call UnparsedNotificationWorkItemRepository to mark the WorkItem as Failed" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -182,7 +182,7 @@ class SendEmailsJobSpec extends UnitSpec {
           verify(pagerDutyAlertManager).managePagerDutyAlert(eqTo(testWorkItem.id))(any[ExecutionContext])
         }
 
-        "call SendEmailWorkItemRepository again for the next WorkItem" in {
+        "call UnparsedNotificationWorkItemRepository again for the next WorkItem" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -200,7 +200,7 @@ class SendEmailsJobSpec extends UnitSpec {
             .thenReturn(Future.successful(true))
         }
 
-        "call SendEmailWorkItemRepository to mark the WorkItem as Failed" in {
+        "call UnparsedNotificationWorkItemRepository to mark the WorkItem as Failed" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -216,7 +216,7 @@ class SendEmailsJobSpec extends UnitSpec {
           verify(pagerDutyAlertManager).managePagerDutyAlert(eqTo(testWorkItem.id))(any[ExecutionContext])
         }
 
-        "call SendEmailWorkItemRepository again for the next WorkItem" in {
+        "call UnparsedNotificationWorkItemRepository again for the next WorkItem" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -235,7 +235,7 @@ class SendEmailsJobSpec extends UnitSpec {
             .thenReturn(Future.successful(true))
         }
 
-        "call SendEmailWorkItemRepository to mark the WorkItem as Failed" in {
+        "call UnparsedNotificationWorkItemRepository to mark the WorkItem as Failed" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue
@@ -251,7 +251,7 @@ class SendEmailsJobSpec extends UnitSpec {
           verify(pagerDutyAlertManager).managePagerDutyAlert(eqTo(testWorkItem.id))(any[ExecutionContext])
         }
 
-        "NOT call SendEmailWorkItemRepository again for the next WorkItem" in {
+        "NOT call UnparsedNotificationWorkItemRepository again for the next WorkItem" in {
           prepareTestScenario()
 
           sendEmailsJob.execute().futureValue

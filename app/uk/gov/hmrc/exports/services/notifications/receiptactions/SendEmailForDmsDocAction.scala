@@ -19,12 +19,12 @@ package uk.gov.hmrc.exports.services.notifications.receiptactions
 import javax.inject.{Inject, Singleton}
 import uk.gov.hmrc.exports.models.declaration.submissions.SubmissionStatus
 import uk.gov.hmrc.exports.models.emails.SendEmailDetails
-import uk.gov.hmrc.exports.repositories.{NotificationRepository, SendEmailWorkItemRepository}
+import uk.gov.hmrc.exports.repositories.{ParsedNotificationRepository, UnparsedNotificationWorkItemRepository}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class SendEmailForDmsDocAction @Inject()(notificationRepository: NotificationRepository, sendEmailWorkItemRepository: SendEmailWorkItemRepository)(
+class SendEmailForDmsDocAction @Inject()(notificationRepository: ParsedNotificationRepository, sendEmailWorkItemRepository: UnparsedNotificationWorkItemRepository)(
   implicit ec: ExecutionContext
 ) {
 

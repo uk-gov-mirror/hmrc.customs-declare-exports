@@ -16,70 +16,19 @@
 
 package uk.gov.hmrc.exports.models.declaration.notifications
 
+import java.util.UUID
+
 import play.api.libs.functional.syntax._
-import play.api.libs.json.{Json, Reads, _}
+import play.api.libs.json._
 import reactivemongo.bson.BSONObjectID
 
-trait Notification
-
-case class ParsedNotification(id: BSONObjectID = BSONObjectID.generate(), actionId: String, payload: String, details: NotificationDetails)
-    extends Notification
-
-case class UnparsedNotification(id: BSONObjectID = BSONObjectID.generate(), actionId: String, payload: String) extends Notification
-
-object Notification {
-
-  object DbFormat {
-
-    val writes: Writes[Notification] = new Writes[Notification] {
-      override def writes(notification: Notification): JsValue = notification match {
-        case unparsedNotification: UnparsedNotification => UnparsedNotification.DbFormat.writes.writes(unparsedNotification)
-        case parsedNotification: ParsedNotification => ParsedNotification.DbFormat.writes.writes(parsedNotification)
-      }
-    }
-
-    val reads: Reads[Notification] = new Reads[Notification] {
-      override def reads(json: JsValue): JsResult[Notification] = json match {
-        case JsObject(map) =>
-          if (map.contains("details")) {
-            ParsedNotification.DbFormat.reads.reads(json)
-          } else {
-            UnparsedNotification.DbFormat.reads.reads(json)
-          }
-        case _ => JsError("Unexpected Notification Format.")
-      }
-    }
-
-    implicit val format: Format[Notification] = Format(reads, writes)
-  }
-
-}
-
-object UnparsedNotification {
-
-//  def apply(actionId: String, notificationXml: NodeSeq): UnparsedNotification =
-//    UnparsedNotification(actionId = actionId, payload = notificationXml.toString)
-
-  object DbFormat {
-    implicit val idFormat = reactivemongo.play.json.BSONFormats.BSONObjectIDFormat
-
-    implicit val writes: Writes[UnparsedNotification] =
-      ((JsPath \ "_id").write[BSONObjectID] and
-        (JsPath \ "actionId").write[String] and
-        (JsPath \ "payload").write[String])(unlift(UnparsedNotification.unapply))
-
-    implicit val reads: Reads[UnparsedNotification] =
-      ((__ \ "_id").read[BSONObjectID] and
-        (__ \ "actionId").read[String] and
-        (__ \ "payload").read[String])(UnparsedNotification.apply _)
-
-//    implicit val notificationsReads: Reads[Seq[ParsedNotification]] = Reads.seq(reads)
-//    implicit val notificationsWrites: Writes[Seq[ParsedNotification]] = Writes.seq(writes)
-
-    implicit val format: Format[UnparsedNotification] = Format(reads, writes)
-  }
-
-}
+case class ParsedNotification(
+  id: BSONObjectID = BSONObjectID.generate(),
+  notificationId: UUID,
+  actionId: String,
+  payload: String,
+  details: NotificationDetails
+)
 
 object ParsedNotification {
 
@@ -88,12 +37,14 @@ object ParsedNotification {
 
     implicit val writes: Writes[ParsedNotification] =
       ((JsPath \ "_id").write[BSONObjectID] and
+        (JsPath \ "notificationId").write[UUID] and
         (JsPath \ "actionId").write[String] and
         (JsPath \ "payload").write[String] and
         (JsPath \ "details").write[NotificationDetails](NotificationDetails.writes))(unlift(ParsedNotification.unapply))
 
     implicit val reads: Reads[ParsedNotification] =
       ((__ \ "_id").read[BSONObjectID] and
+        (__ \ "notificationId").read[UUID] and
         (__ \ "actionId").read[String] and
         (__ \ "payload").read[String] and
         (__ \ "details").read[NotificationDetails])(ParsedNotification.apply _)

@@ -26,7 +26,7 @@ import testdata.notifications.ExampleXmlAndNotificationDetailsPair._
 import testdata.notifications.NotificationTestData.notification
 import uk.gov.hmrc.exports.base.UnitSpec
 import uk.gov.hmrc.exports.models.declaration.notifications.ParsedNotification
-import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
+import uk.gov.hmrc.exports.repositories.{ParsedNotificationRepository, SubmissionRepository}
 import uk.gov.hmrc.exports.services.notifications.NotificationFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,7 +35,7 @@ import scala.concurrent.Future
 class ParseAndSaveActionSpec extends UnitSpec {
 
   private val submissionRepository = mock[SubmissionRepository]
-  private val notificationRepository = mock[NotificationRepository]
+  private val notificationRepository = mock[ParsedNotificationRepository]
   private val notificationFactory = mock[NotificationFactory]
 
   private val parseAndSaveProcess = new ParseAndSaveAction(submissionRepository, notificationRepository, notificationFactory)

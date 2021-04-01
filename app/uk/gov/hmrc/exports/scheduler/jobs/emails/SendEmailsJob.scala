@@ -24,7 +24,7 @@ import play.api.Logging
 import uk.gov.hmrc.exports.config.AppConfig
 import uk.gov.hmrc.exports.models.emails.SendEmailDetails
 import uk.gov.hmrc.exports.models.emails.SendEmailResult._
-import uk.gov.hmrc.exports.repositories.SendEmailWorkItemRepository
+import uk.gov.hmrc.exports.repositories.UnparsedNotificationWorkItemRepository
 import uk.gov.hmrc.exports.scheduler.jobs.ScheduledJob
 import uk.gov.hmrc.exports.services.email.EmailSender
 import uk.gov.hmrc.workitem.{Failed, Succeeded, WorkItem}
@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @Singleton
 class SendEmailsJob @Inject()(
   appConfig: AppConfig,
-  sendEmailWorkItemRepository: SendEmailWorkItemRepository,
+  sendEmailWorkItemRepository: UnparsedNotificationWorkItemRepository,
   emailSender: EmailSender,
   pagerDutyAlertManager: PagerDutyAlertManager
 )(implicit @Named("jobsExecutionContext") ec: ExecutionContext)

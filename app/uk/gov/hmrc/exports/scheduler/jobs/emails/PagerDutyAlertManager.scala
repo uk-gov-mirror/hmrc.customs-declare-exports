@@ -22,7 +22,7 @@ import reactivemongo.api.ReadPreference
 import reactivemongo.bson.BSONObjectID
 import uk.gov.hmrc.exports.config.AppConfig
 import uk.gov.hmrc.exports.models.emails.SendEmailDetails
-import uk.gov.hmrc.exports.repositories.SendEmailWorkItemRepository
+import uk.gov.hmrc.exports.repositories.UnparsedNotificationWorkItemRepository
 import uk.gov.hmrc.workitem.WorkItem
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @Singleton
 class PagerDutyAlertManager @Inject()(
   appConfig: AppConfig,
-  sendEmailWorkItemRepository: SendEmailWorkItemRepository,
+  sendEmailWorkItemRepository: UnparsedNotificationWorkItemRepository,
   pagerDutyAlertValidator: PagerDutyAlertValidator
 ) extends Logging {
 

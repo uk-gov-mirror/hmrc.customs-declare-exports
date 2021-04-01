@@ -20,7 +20,7 @@ import javax.inject.{Inject, Singleton}
 import play.api.Logging
 import uk.gov.hmrc.exports.models.declaration.notifications.{ParsedNotification, UnparsedNotification}
 import uk.gov.hmrc.exports.models.declaration.submissions.Submission
-import uk.gov.hmrc.exports.repositories.{NotificationRepository, SubmissionRepository}
+import uk.gov.hmrc.exports.repositories.{ParsedNotificationRepository, SubmissionRepository, UnparsedNotificationRepository}
 import uk.gov.hmrc.exports.services.notifications.NotificationFactory
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -29,7 +29,8 @@ import scala.util.Success
 @Singleton
 class ParseAndSaveAction @Inject()(
   submissionRepository: SubmissionRepository,
-  notificationRepository: NotificationRepository,
+  unparsedNotificationRepository: UnparsedNotificationRepository,
+  parsedNotificationRepository: ParsedNotificationRepository,
   notificationFactory: NotificationFactory
 )(implicit executionContext: ExecutionContext)
     extends Logging {
@@ -40,7 +41,7 @@ class ParseAndSaveAction @Inject()(
 
     if (parsedNotifications.nonEmpty) {
       save(parsedNotifications).map { _ =>
-        notificationRepository.removeUnparsedNotificationsForActionId(notification.actionId)
+        unparsedNotificationRepository.removeByActionId(notification.actionId)
       }
     } else
       Future.successful((): Unit)
@@ -50,16 +51,16 @@ class ParseAndSaveAction @Inject()(
     Future
       .sequence(notifications.map { notification =>
         for {
-          _ <- notificationRepository.insert(notification)
+          _ <- parsedNotificationRepository.insert(notification)
           _ <- updateRelatedSubmission(notification)
         } yield ()
       })
       .map(_ => ())
 
   private def updateRelatedSubmission(notification: ParsedNotification): Future[Option[Submission]] =
-      submissionRepository.updateMrn(notification.actionId, notification.details.mrn).andThen {
-        case Success(None) =>
-          logger.warn(s"Could not find Submission to update for actionId: ${notification.actionId}")
-      }
+    submissionRepository.updateMrn(notification.actionId, notification.details.mrn).andThen {
+      case Success(None) =>
+        logger.warn(s"Could not find Submission to update for actionId: ${notification.actionId}")
+    }
 
 }

@@ -24,7 +24,7 @@ import testdata.notifications.NotificationTestData.notification
 import uk.gov.hmrc.exports.base.UnitSpec
 import uk.gov.hmrc.exports.models.declaration.submissions.SubmissionStatus
 import uk.gov.hmrc.exports.models.emails.SendEmailDetails
-import uk.gov.hmrc.exports.repositories.{NotificationRepository, SendEmailWorkItemRepository}
+import uk.gov.hmrc.exports.repositories.{ParsedNotificationRepository, UnparsedNotificationWorkItemRepository}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.workitem.{ToDo, WorkItem}
 
@@ -34,8 +34,8 @@ import scala.concurrent.{ExecutionContext, Future}
 class SendEmailForDmsDocActionSpec extends UnitSpec {
 
   private implicit val hc: HeaderCarrier = mock[HeaderCarrier]
-  private val notificationRepository = mock[NotificationRepository]
-  private val sendEmailWorkItemRepository = mock[SendEmailWorkItemRepository]
+  private val notificationRepository = mock[ParsedNotificationRepository]
+  private val sendEmailWorkItemRepository = mock[UnparsedNotificationWorkItemRepository]
 
   private val sendEmailForDmsDocAction = new SendEmailForDmsDocAction(notificationRepository, sendEmailWorkItemRepository)
 
@@ -79,7 +79,7 @@ class SendEmailForDmsDocActionSpec extends UnitSpec {
         item = testSendEmailDetails
       )
 
-      "SendEmailWorkItemRepository returns successful Future" should {
+      "UnparsedNotificationWorkItemRepository returns successful Future" should {
 
         "return successful Future" in {
           when(notificationRepository.findNotificationsByActionId(any[String])).thenReturn(Future.successful(Seq(testNotification)))
@@ -98,7 +98,7 @@ class SendEmailForDmsDocActionSpec extends UnitSpec {
         }
       }
 
-      "SendEmailWorkItemRepository throws an Exception" should {
+      "UnparsedNotificationWorkItemRepository throws an Exception" should {
 
         "propagate this exception" in {
           when(notificationRepository.findNotificationsByActionId(any[String])).thenReturn(Future.successful(Seq(testNotification)))
@@ -121,7 +121,7 @@ class SendEmailForDmsDocActionSpec extends UnitSpec {
         sendEmailForDmsDocAction.execute(testActionId).futureValue mustBe unit
       }
 
-      "not call SendEmailWorkItemRepository" in {
+      "not call UnparsedNotificationWorkItemRepository" in {
         when(notificationRepository.findNotificationsByActionId(any[String])).thenReturn(Future.successful(Seq(testNotification)))
 
         sendEmailForDmsDocAction.execute(testActionId).futureValue
