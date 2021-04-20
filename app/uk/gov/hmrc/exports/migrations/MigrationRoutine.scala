@@ -19,13 +19,15 @@ package uk.gov.hmrc.exports.migrations
 import com.github.cloudyrock.mongock.{Mongock, MongockBuilder}
 import com.google.inject.Singleton
 import com.mongodb.{MongoClient, MongoClientURI}
-import javax.inject.Inject
 import play.api.Logger
 import uk.gov.hmrc.exports.config.{AppConfig, ExportsMigrationConfig}
-import uk.gov.hmrc.exports.migrations.changelogs.notification.MakeParsedDetailsOptional
+import uk.gov.hmrc.exports.migrations.changelogs.notification.{MakeParsedDetailsOptional, SplitNotificationsCollection}
 import uk.gov.hmrc.exports.routines.{Routine, RoutinesExecutionContext}
 
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 
 @Singleton
 class MigrationRoutine @Inject()(appConfig: AppConfig, exportsMigrationConfig: ExportsMigrationConfig)(implicit mec: RoutinesExecutionContext)
@@ -51,9 +53,17 @@ class MigrationRoutine @Inject()(appConfig: AppConfig, exportsMigrationConfig: E
     val lockManagerConfig = LockManagerConfig(lockMaxTries = 10, lockMaxWaitMillis = minutesToMillis(5), lockAcquiredForMillis = minutesToMillis(3))
     val migrationsRegistry = MigrationsRegistry()
       .register(new MakeParsedDetailsOptional())
+      .register(new SplitNotificationsCollection())
     val migrationTool = ExportsMigrationTool(db, migrationsRegistry, lockManagerConfig)
 
+    // TODO: Remove time measurements
+    val startTime = System.nanoTime()
     migrationTool.execute()
+    val endTime = System.nanoTime()
+
+    val executionTime = Duration(endTime - startTime, TimeUnit.NANOSECONDS)
+    logger.info(s"Migration execution time: ${executionTime.toMillis} ms")
+
     client.close()
   }
 

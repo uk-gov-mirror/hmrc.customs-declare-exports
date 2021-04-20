@@ -20,7 +20,7 @@ import com.mongodb.client.MongoDatabase
 import org.bson.Document
 import org.joda.time.DateTime
 import org.mongodb.scala.bson.conversions.Bson
-import org.mongodb.scala.model.Filters.{and, exists, not, eq => feq}
+import org.mongodb.scala.model.Filters.{exists, not, eq => feq}
 import org.mongodb.scala.model.Updates.{combine, set, unset}
 import play.api.Logging
 import play.api.libs.json.Json
@@ -72,6 +72,8 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
           if (!document.containsKey(Details)) {
             removeFromNotificationsCollection(document)
           } else {
+//            getUnparsedNotificationsCollection.find()
+
             val unparsedNotificationId = migratedNotificationsMap(newUnparsedNotificationPartialHash).id
             updateInNotificationsCollection(document, unparsedNotificationId)
           }
@@ -132,7 +134,7 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
 
   private def removeFromNotificationsCollection(document: Document)(implicit db: MongoDatabase) = {
     val documentId = document.get(IndexId)
-    val filter = and(feq(IndexId, documentId))
+    val filter = feq(IndexId, documentId)
     logger.info(s"Removing: [filter: $filter]")
 
     getNotificationsCollection.deleteOne(filter)
@@ -140,7 +142,7 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
 
   private def updateInNotificationsCollection(document: Document, unparsedNotificationId: UUID)(implicit db: MongoDatabase) = {
     val documentId = document.get(IndexId)
-    val filter = and(feq(IndexId, documentId))
+    val filter = feq(IndexId, documentId)
     val update = combine(set(UnparsedNotificationId, unparsedNotificationId.toString), unset(Payload))
     logger.info(s"Updating: [filter: $filter] [update: $update]")
 
