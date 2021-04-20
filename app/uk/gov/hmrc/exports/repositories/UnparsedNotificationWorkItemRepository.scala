@@ -41,7 +41,10 @@ class UnparsedNotificationWorkItemRepository @Inject()(configuration: Configurat
   override lazy val collection: JSONCollection =
     mongo().collection[JSONCollection](collectionName, failoverStrategy = RepositorySettings.failoverStrategy)
 
-  override def indexes: Seq[Index] = super.indexes ++ Seq(Index(key = Seq("item.id" -> IndexType.Ascending), name = Some("idIdx"), unique = true))
+  override def indexes: Seq[Index] = super.indexes ++ Seq(
+    Index(key = Seq("item.id" -> IndexType.Ascending), name = Some("itemIdIdx"), unique = true),
+    Index(key = Seq("item.actionId" -> IndexType.Ascending, "item.payload" -> IndexType.Ascending), name = Some("actionIdAndPayloadIdx"), unique = true)
+  )
 
   override def now: DateTime = DateTime.now
 

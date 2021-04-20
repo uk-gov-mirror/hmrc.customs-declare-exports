@@ -20,7 +20,7 @@ import com.mongodb.client.MongoDatabase
 import org.bson.Document
 import org.joda.time.DateTime
 import org.mongodb.scala.bson.conversions.Bson
-import org.mongodb.scala.model.Filters.{exists, not, eq => feq}
+import org.mongodb.scala.model.Filters.{and, exists, not, eq => feq}
 import org.mongodb.scala.model.Updates.{combine, set, unset}
 import play.api.Logging
 import play.api.libs.json.Json
@@ -35,7 +35,7 @@ import uk.gov.hmrc.workitem.{ProcessingStatus, Succeeded, ToDo, WorkItem}
 import java.util.UUID
 import javax.inject.Singleton
 import scala.collection.JavaConverters._
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.{HashMap, HashSet}
 
 @Singleton
 class SplitNotificationsCollection extends MigrationDefinition with Logging {
@@ -53,9 +53,11 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
   private val Details = "details"
   private val Payload = "payload"
   private val UnparsedNotificationId = "unparsedNotificationId"
+  private val ActionId = "actionId"
 
   implicit private val workItemFormat = WorkItemFormat.workItemMongoFormat[UnparsedNotification]()
 
+  //noinspection ScalaStyle
   override def migrationFunction(db: MongoDatabase): Unit = {
     logger.info(s"Applying '${migrationInformation.id}' db migration...  ")
     implicit val mongoDb: MongoDatabase = db
@@ -63,19 +65,22 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
     val documentsToMigrateQuery = not(exists(UnparsedNotificationId))
     val queryBatchSize = 10
 
-    getDocumentsToMigrate(documentsToMigrateQuery, queryBatchSize).foldLeft(buildUnparsedNotificationsHashMap) {
+    getDocumentsToMigrate(documentsToMigrateQuery, queryBatchSize).foldLeft(buildUnparsedNotificationsHashSet) {
       (migratedNotificationsMap, document) =>
         val newUnparsedNotification = buildUnparsedNotification(document)
-        val newUnparsedNotificationPartialHash = HashFields(newUnparsedNotification).##
+        val newUnparsedNotificationHash = HashFields(newUnparsedNotification).##
 
-        if (migratedNotificationsMap.contains(newUnparsedNotificationPartialHash)) {
+        if (migratedNotificationsMap.contains(newUnparsedNotificationHash)) {
           if (!document.containsKey(Details)) {
             removeFromNotificationsCollection(document)
           } else {
-//            getUnparsedNotificationsCollection.find()
+            val query = and(feq(s"item.$ActionId", newUnparsedNotification.actionId), feq(s"item.$Payload", newUnparsedNotification.payload))
+            // TODO: This part needs to be more secure
+            getUnparsedNotificationsCollection.find(query).asScala.headOption.map { doc =>
 
-            val unparsedNotificationId = migratedNotificationsMap(newUnparsedNotificationPartialHash).id
-            updateInNotificationsCollection(document, unparsedNotificationId)
+              val unparsedNotificationId = doc.get("item", classOf[Document]).getString("id")
+              updateInNotificationsCollection(document, unparsedNotificationId)
+            }
           }
 
           migratedNotificationsMap
@@ -85,12 +90,35 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
             removeFromNotificationsCollection(document)
           } else {
             insertUnparsedNotification(newUnparsedNotification, Succeeded)
-            updateInNotificationsCollection(document, newUnparsedNotification.id)
+            updateInNotificationsCollection(document, newUnparsedNotification.id.toString)
           }
 
-          migratedNotificationsMap + (newUnparsedNotificationPartialHash -> newUnparsedNotification)
+          migratedNotificationsMap + newUnparsedNotificationHash
         }
     }
+
+//    getDocumentsToMigrate(documentsToMigrateQuery, queryBatchSize).foreach { document =>
+//        val newUnparsedNotification = buildUnparsedNotification(document)
+//
+//        val migratedUnparsedNotification = getUnparsedNotificationsCollection.find(and(feq(s"item.$ActionId", newUnparsedNotification.actionId), feq(s"item.$Payload", newUnparsedNotification.payload))).asScala.toSeq
+//
+//        if (migratedUnparsedNotification.nonEmpty) {
+//          if (!document.containsKey(Details)) {
+//            removeFromNotificationsCollection(document)
+//          } else {
+//            val unparsedNotificationId = migratedUnparsedNotification.head.get("item", classOf[Document]).getString("id")
+//            updateInNotificationsCollection(document, unparsedNotificationId)
+//          }
+//        }else {
+//          if (!document.containsKey(Details)) {
+//            insertUnparsedNotification(newUnparsedNotification, ToDo)
+//            removeFromNotificationsCollection(document)
+//          } else {
+//            insertUnparsedNotification(newUnparsedNotification, Succeeded)
+//            updateInNotificationsCollection(document, newUnparsedNotification.id.toString)
+//          }
+//        }
+//    }
 
     removeRedundantIndexes()
     logger.info(s"Applying '${migrationInformation.id}' db migration... Done.")
@@ -107,14 +135,23 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
     }
   }
 
-  private def buildUnparsedNotificationsHashMap(implicit db: MongoDatabase): HashMap[Int, UnparsedNotification] = {
+  private def buildUnparsedNotificationsHashSet(implicit db: MongoDatabase): HashSet[Int] = {
     val queryBatchSize = 10
 
     asScalaIterator(getUnparsedNotificationsCollection.find().batchSize(queryBatchSize).iterator)
       .map(_.get("item", classOf[Document]))
-      .map(buildUnparsedNotification)
-      .foldLeft(HashMap.empty[Int, UnparsedNotification])(
-        (mapAcc, unparsedNotification) => mapAcc + (HashFields(unparsedNotification).## -> unparsedNotification)
+      .foldLeft(HashSet.empty[Int])(
+        (mapAcc, doc) => mapAcc + HashFields(buildUnparsedNotification(doc)).##
+      )
+  }
+
+  private def buildUnparsedNotificationsHashMap(implicit db: MongoDatabase): HashMap[HashFields, UUID] = {
+    val queryBatchSize = 10
+
+    asScalaIterator(getUnparsedNotificationsCollection.find().batchSize(queryBatchSize).iterator)
+      .map(_.get("item", classOf[Document]))
+      .foldLeft(HashMap.empty[HashFields, UUID])(
+        (mapAcc, doc) => mapAcc + (HashFields(buildUnparsedNotification(doc)) -> UUID.fromString(doc.getString("id")))
       )
   }
 
@@ -140,7 +177,7 @@ class SplitNotificationsCollection extends MigrationDefinition with Logging {
     getNotificationsCollection.deleteOne(filter)
   }
 
-  private def updateInNotificationsCollection(document: Document, unparsedNotificationId: UUID)(implicit db: MongoDatabase) = {
+  private def updateInNotificationsCollection(document: Document, unparsedNotificationId: String)(implicit db: MongoDatabase) = {
     val documentId = document.get(IndexId)
     val filter = feq(IndexId, documentId)
     val update = combine(set(UnparsedNotificationId, unparsedNotificationId.toString), unset(Payload))
